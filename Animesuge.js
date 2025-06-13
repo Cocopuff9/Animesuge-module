@@ -1,42 +1,62 @@
+const BASE_URL = "https://animesugetv.se";
+
 export async function search(query) {
-  const res = await fetch(`https://animesugetv.se/search.html?keyword=${encodeURIComponent(query)}`);
-  const html = await res.text();
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  
-  return Array.from(doc.querySelectorAll(".anime__details a")).map(el => ({
-    title: el.querySelector("h5")?.textContent.trim(),
-    url: el.href,
-    poster: el.querySelector("img")?.src
-  }));
+    const res = await fetch(`${BASE_URL}/search.html?keyword=${encodeURIComponent(query)}`);
+    const html = await res.text();
+
+    const items = [];
+    const regex = /<a href="(\/anime\/[^"]+)"[^>]*title="([^"]+)">[\s\S]*?<img src="([^"]+)/g;
+    let match;
+    while ((match = regex.exec(html)) !== null) {
+        items.push({
+            title: match[2],
+            url: BASE_URL + match[1],
+            image: match[3].startsWith("http") ? match[3] : "https:" + match[3]
+        });
+    }
+
+    return items;
 }
 
 export async function details(url) {
-  const res = await fetch(url);
-  const html = await res.text();
-  const doc = new DOMParser().parseFromString(html, "text/html");
+    const res = await fetch(url);
+    const html = await res.text();
 
-  const title = doc.querySelector(".anime__details__title h3")?.textContent.trim();
-  const description = doc.querySelector(".anime__details__text p")?.textContent.trim();
-  const episodes = Array.from(doc.querySelectorAll(".episodes a")).map(el => ({
-    name: el.textContent.trim(),
-    url: el.href
-  }));
+    const titleMatch = html.match(/<h1[^>]*>([^<]+)<\/h1>/);
+    const imageMatch = html.match(/class="film-poster-img"[^>]+src="([^"]+)"/);
+    const epRegex = /<a href="(\/watch\/[^"]+)"[^>]*>([^<]+)<\/a>/g;
 
-  return { title, description, episodes, poster: "" };
+    const episodes = [];
+    let epMatch;
+    while ((epMatch = epRegex.exec(html)) !== null) {
+        episodes.push({
+            title: epMatch[2],
+            url: BASE_URL + epMatch[1]
+        });
+    }
+
+    return {
+        title: titleMatch ? titleMatch[1] : "Unknown Title",
+        image: imageMatch ? (imageMatch[1].startsWith("http") ? imageMatch[1] : "https:" + imageMatch[1]) : "",
+        episodes: episodes.reverse() // newer first
+    };
 }
 
-export async function stream(episodeUrl) {
-  const res = await fetch(episodeUrl);
-  const html = await res.text();
-  const doc = new DOMParser().parseFromString(html, "text/html");
+export async function stream(url) {
+    const res = await fetch(url);
+    const html = await res.text();
 
-  const iframeUrl = doc.querySelector("iframe")?.src;
-  if (!iframeUrl) throw new Error("Stream iframe not found");
+    const iframeMatch = html.match(/<iframe[^>]+src="([^"]+)"/);
+    if (!iframeMatch) throw new Error("No iframe found");
 
-  const res2 = await fetch(iframeUrl);
-  const text2 = await res2.text();
-  const m3u8 = text2.match(/(https?:\/\/[^"']+\.m3u8)/)?.[1];
-  if (!m3u8) throw new Error("HLS stream URL not found");
+    const embedUrl = iframeMatch[1].startsWith("http") ? iframeMatch[1] : "https:" + iframeMatch[1];
+    const embedRes = await fetch(embedUrl);
+    const embedHtml = await embedRes.text();
 
-  return [{ url: m3u8, quality: "default", subtitles: [] }];
+    const sourceMatch = embedHtml.match(/"file":"([^"]+\.m3u8)"/);
+    if (!sourceMatch) throw new Error("No stream URL found");
+
+    return {
+        stream: sourceMatch[1]
+    };
 }
