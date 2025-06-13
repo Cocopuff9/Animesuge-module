@@ -1,0 +1,11 @@
+{
+  "id": "com.animesuge.module",
+  "name": "AnimeSugeTV",
+  "description": "Unofficial AnimeSuge module",
+  "version": "1.0.0",
+  "author": "Cocopuff9",
+  "type": "anime",
+  "details": "https://raw.githubusercontent.com/Cocopuff9/Animesuge-module/main/details.js",
+  "episodes": "https://raw.githubusercontent.com/Cocopuff9/Animesuge-module/main/details.js",
+  "stream": "https://raw.githubusercontent.com/Cocopuff9/Animesuge-module/main/stream.js"
+}
